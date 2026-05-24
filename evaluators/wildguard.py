@@ -15,7 +15,7 @@ class WildGuardEvaluator(nn.Module):
     
     def __init__(self) -> None:
         super().__init__()
-        model_id = "allenai/wildguard"
+        model_id = "/home/h24/baga0553/models/wildguard"
         # self.llama_gard = AbsoluteHarmfulnessPredictor(setup)
         self.guard = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16, device_map='auto')
         self.tokenizer_guard = AutoTokenizer.from_pretrained(model_id)
@@ -134,7 +134,7 @@ Answers: [/INST]
         for data in tqdm(completions):#, total=len(data_loader), enrich_print=False, disable=not verbose):
 
             prompt = data["instruction_en"] 
-            response = data["response"] if cfg.lang == 'en' else data["response_translated"]
+            response = response = data.get("response_translated", data["response"]) if cfg.lang != 'en' else data["response"]
             model_input = self.instruction_format.format(prompt=prompt, response=response)
 
             tokenized_input = self.tokenizer_guard([model_input], return_tensors='pt', add_special_tokens=False).to("cuda")

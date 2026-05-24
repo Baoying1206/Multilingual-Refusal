@@ -126,3 +126,40 @@ def get_activation_addition_input_pre_hook(vector: Float[Tensor, "d_model"], coe
         else:
             return activation
     return hook_fn
+def get_dri_input_pre_hook(
+    direction: Float[Tensor, "d_model"],
+    p_target: float,
+    alpha: float = 1.0
+):
+    """
+    Dynamic Representation Intervention (DRI) hook.
+    Pushes input activation toward the harmful cluster
+    by the gap between current position and target position.
+    """
+    def hook_fn(module, input):
+        nonlocal direction
+
+        if isinstance(input, tuple):
+            activation: Float[Tensor, "batch_size seq_len d_model"] = input[0]
+        else:
+            activation: Float[Tensor, "batch_size seq_len d_model"] = input
+
+        # Normalize direction
+        direction_normalized = direction / (direction.norm() + 1e-8)
+        direction_normalized = direction_normalized.to(activation)
+
+        # Project activation onto refusal direction
+        p_current = (activation @ direction_normalized)
+
+        # Compute gap: how far below the harmful baseline
+        gap = torch.clamp(p_target - p_current, min=0)
+
+        # Push activation toward harmful region
+        activation = activation + alpha * gap.unsqueeze(-1) * direction_normalized
+
+        if isinstance(input, tuple):
+            return (activation, *input[1:])
+        else:
+            return activation
+
+    return hook_fn

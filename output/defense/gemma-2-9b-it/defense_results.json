@@ -1,0 +1,82 @@
+{
+  "model": "gemma-2-9b-it",
+  "alpha": 20.0,
+  "beta": 1.0,
+  "layer": 21,
+  "n_layers": 42,
+  "per_language": {
+    "en": {
+      "n_test": 572,
+      "baseline_refusal": 0.9947552447552448
+    },
+    "de": {
+      "n_test": 572,
+      "baseline_refusal": 0.986013986013986
+    },
+    "ja": {
+      "n_test": 572,
+      "baseline_refusal": 0.9388111888111889,
+      "rda_refusal": 0.9632867132867133,
+      "gid_refusal": 0.9632867132867133
+    },
+    "ko": {
+      "n_test": 572,
+      "baseline_refusal": 0.9143356643356644,
+      "rda_refusal": 0.9493006993006993,
+      "gid_refusal": 0.9458041958041958
+    },
+    "zh": {
+      "n_test": 572,
+      "baseline_refusal": 0.9685314685314685
+    },
+    "ru": {
+      "n_test": 572,
+      "baseline_refusal": 0.972027972027972
+    },
+    "th": {
+      "n_test": 572,
+      "baseline_refusal": 0.9475524475524476,
+      "rda_refusal": 0.916083916083916,
+      "gid_refusal": 0.9003496503496503
+    },
+    "yo": {
+      "n_test": 572,
+      "baseline_refusal": 0.4353146853146853,
+      "rda_refusal": 0.05944055944055944,
+      "gid_refusal": 0.0979020979020979
+    },
+    "ar": {
+      "n_test": 572,
+      "baseline_refusal": 0.9597902097902098,
+      "rda_refusal": 0.972027972027972,
+      "gid_refusal": 0.9772727272727273
+    },
+    "es": {
+      "n_test": 572,
+      "baseline_refusal": 0.972027972027972
+    },
+    "fr": {
+      "n_test": 572,
+      "baseline_refusal": 0.9842657342657343
+    },
+    "it": {
+      "n_test": 572,
+      "baseline_refusal": 0.9912587412587412
+    },
+    "nl": {
+      "n_test": 572,
+      "baseline_refusal": 0.9842657342657343
+    },
+    "pl": {
+      "n_test": 572,
+      "baseline_refusal": 0.9755244755244755
+    }
+  },
+  "macro": {
+    "baseline": 0.9303196803196804,
+    "rda": 0.772027972027972,
+    "gid": 0.776923076923077,
+    "delta_rda": -0.15829170829170836,
+    "delta_gid": -0.15339660339660333
+  }
+}

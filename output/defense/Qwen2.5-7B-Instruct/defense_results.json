@@ -1,0 +1,100 @@
+{
+  "model": "Qwen2.5-7B-Instruct",
+  "alpha": 20.0,
+  "beta": 1.0,
+  "layer": 14,
+  "n_layers": 28,
+  "per_language": {
+    "en": {
+      "n_test": 572,
+      "baseline_refusal": 0.9108391608391608,
+      "rda_refusal": 1.0,
+      "gid_refusal": 1.0
+    },
+    "de": {
+      "n_test": 572,
+      "baseline_refusal": 0.8583916083916084,
+      "rda_refusal": 0.993006993006993,
+      "gid_refusal": 0.9947552447552448
+    },
+    "ja": {
+      "n_test": 572,
+      "baseline_refusal": 0.7709790209790209,
+      "rda_refusal": 0.9982517482517482,
+      "gid_refusal": 0.9982517482517482
+    },
+    "ko": {
+      "n_test": 572,
+      "baseline_refusal": 0.7622377622377622,
+      "rda_refusal": 0.9895104895104895,
+      "gid_refusal": 0.9947552447552448
+    },
+    "zh": {
+      "n_test": 572,
+      "baseline_refusal": 0.8583916083916084,
+      "rda_refusal": 0.9982517482517482,
+      "gid_refusal": 0.9982517482517482
+    },
+    "ru": {
+      "n_test": 572,
+      "baseline_refusal": 0.9020979020979021,
+      "rda_refusal": 1.0,
+      "gid_refusal": 1.0
+    },
+    "th": {
+      "n_test": 572,
+      "baseline_refusal": 0.7814685314685315,
+      "rda_refusal": 0.9667832167832168,
+      "gid_refusal": 0.9667832167832168
+    },
+    "yo": {
+      "n_test": 572,
+      "baseline_refusal": 0.23426573426573427,
+      "rda_refusal": 0.019230769230769232,
+      "gid_refusal": 0.33916083916083917
+    },
+    "ar": {
+      "n_test": 572,
+      "baseline_refusal": 0.8496503496503497,
+      "rda_refusal": 0.9947552447552448,
+      "gid_refusal": 1.0
+    },
+    "es": {
+      "n_test": 572,
+      "baseline_refusal": 0.9073426573426573,
+      "rda_refusal": 0.9982517482517482,
+      "gid_refusal": 1.0
+    },
+    "fr": {
+      "n_test": 572,
+      "baseline_refusal": 0.8793706293706294,
+      "rda_refusal": 0.9965034965034965,
+      "gid_refusal": 1.0
+    },
+    "it": {
+      "n_test": 572,
+      "baseline_refusal": 0.9073426573426573,
+      "rda_refusal": 0.9982517482517482,
+      "gid_refusal": 0.9982517482517482
+    },
+    "nl": {
+      "n_test": 572,
+      "baseline_refusal": 0.8356643356643356,
+      "rda_refusal": 1.0,
+      "gid_refusal": 0.9982517482517482
+    },
+    "pl": {
+      "n_test": 572,
+      "baseline_refusal": 0.8706293706293706,
+      "rda_refusal": 1.0,
+      "gid_refusal": 1.0
+    }
+  },
+  "macro": {
+    "baseline": 0.809190809190809,
+    "rda": 0.9251998001998002,
+    "gid": 0.9491758241758241,
+    "delta_rda": 0.1160089910089912,
+    "delta_gid": 0.13998501498501514
+  }
+}

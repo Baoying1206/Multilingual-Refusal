@@ -360,7 +360,8 @@ def run_pipeline(config_path, model_path, batch_size):
     #     lm_eval_results_baseline = eval_harness(cfg, model_base, 'baseline')
     #     # save results
     with add_hooks(module_forward_pre_hooks=harm_ablation_fwd_pre_hooks, module_forward_hooks=harm_ablation_fwd_hooks):
-        lm_eval_results_harm_actadd = eval_harness(cfg, model_base, 'harm_ablation')
+        # lm_eval_results_harm_actadd = eval_harness(cfg, model_base, "harm_ablation")
+        pass
 
     
     
