@@ -2,8 +2,7 @@
 #SBATCH --job-name=extract-jb-vec
 #SBATCH --partition=gpu
 #SBATCH --account=slurm-students 
-#SBATCH --output=/home/h24/baga0553/thesis_experiment/Multilingual-Refusal/slurm-%A_%a.out
-#SBATCH --chdir=/home/h24/baga0553/thesis_experiment/Multilingual-Refusal
+#SBATCH --output=slurm/logs/extract_jb_%A_%a.out
 
 MODEL_PATHS=(
       "/home/h24/baga0553/models/Qwen2.5-7B-Instruct"
@@ -11,17 +10,19 @@ MODEL_PATHS=(
       "/home/h24/baga0553/models/gemma-2-9b-it"
 )
 MODEL_ALIASES=(
-      "Qwen2.5-7B-Instruct"
-      "Meta-Llama-3.1-8B-Instruct"
-      "gemma-2-9b-it" 
+    "Qwen2.5-7B-Instruct"
+    "Meta-Llama-3.1-8B-Instruct"
+    "gemma-2-9b-it"
 )
-
+  
 MODEL_PATH=${MODEL_PATHS[$SLURM_ARRAY_TASK_ID]}
 MODEL_ALIAS=${MODEL_ALIASES[$SLURM_ARRAY_TASK_ID]}
-  
-echo "Model: $MODEL_ALIAS  Start: $(date)"
 
-source ~/thesis_experiment/Multilingual-Refusal/venv/bin/activate
+echo "Model: $MODEL_ALIAS  Start: $(date)"
+  
+cd ~/thesis_experiment/Multilingual-Refusal
+mkdir -p slurm/logs
+source venv/bin/activate
 export PYTHONPATH=/home/h24/baga0553/thesis_experiment/Multilingual-Refusal:$PYTHONPATH
 
 python scripts/extract_jailbreak_vectors.py \

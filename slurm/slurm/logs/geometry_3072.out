@@ -1,0 +1,21 @@
+Start: Tue May 26 23:38:26 CEST 2026
+Loading results...
+  Loaded: Qwen2.5-7B-Instruct
+  Loaded: Meta-Llama-3.1-8B-Instruct
+  Loaded: gemma-2-9b-it
+
+Generating figures...
+  Saved: output/figures/fig1_rq1_heatmaps.pdf
+  Saved: output/figures/fig2_rq1_layer_profiles.pdf
+  Saved: output/figures/fig3_rq2_cross_lingual.pdf
+  Saved: output/figures/fig4_diagonal_comparison.pdf
+  Saved: output/figures/fig5_yoruba_anomaly.pdf
+  Saved: output/figures/fig6_l2_norm_profiles.pdf
+  Saved: output/figures/fig7_three_way_geometry.pdf
+  Loaded transfer: Qwen2.5-7B-Instruct
+  Loaded transfer: Meta-Llama-3.1-8B-Instruct
+  Loaded transfer: gemma-2-9b-it
+  Saved: output/figures/fig8_rq2_transfer_bypass.pdf
+
+Done. All figures saved to output/figures/
+Done: Tue May 26 23:38:33 CEST 2026

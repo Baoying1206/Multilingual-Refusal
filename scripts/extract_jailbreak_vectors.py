@@ -101,6 +101,24 @@ def extract_refusal_direction(model_base, lang, n_train, random_seed, batch_size
     return refusal_dir
 
 
+def extract_harmfulness_direction(model_base, bypassed, lang, n_train, random_seed, batch_size):
+    """
+    Harmfulness direction = mean(bypassed_harmful) - mean(harmless).
+    Captures pure harm signal without refusal component:
+    bypassed samples are harmful inputs the model complied with, so they carry
+    harmfulness encoding but NOT the refusal signal.
+    """
+    random.seed(random_seed + 99)
+    harmless = random.sample(
+        load_dataset_split('harmless', 'train', lang=lang, instructions_only=True), n_train)
+
+    sample = bypassed[:n_train] if len(bypassed) > n_train else bypassed
+    act_bypassed = extract_mean_activations(model_base, sample,   batch_size)
+    act_harmless = extract_mean_activations(model_base, harmless, batch_size)
+
+    return act_bypassed - act_harmless  # [n_layers, d_model]
+
+
 def compute_cosine_similarity(vec_a, vec_b):
     """Layer-wise cosine similarity between two [n_layers, d_model] tensors."""
     return F.cosine_similarity(
@@ -139,9 +157,11 @@ def main(args):
 
     results = {
         'model': model_alias,
-        'jailbreak_vectors': {},   # lang -> layer-wise vector stats
-        'refusal_directions': {},  # lang -> extracted
-        'cosine_similarities': {}, # (jb_lang, refusal_lang) -> [cos_sim per layer]
+        'jailbreak_vectors': {},      # lang -> layer-wise vector stats
+        'refusal_directions': {},     # lang -> extracted
+        'harmfulness_directions': {}, # lang -> extracted
+        'cosine_similarities': {},    # (jb_lang, refusal_lang) -> [cos_sim per layer]
+        'three_way_similarities': {}, # lang -> {jb_vs_refusal, jb_vs_harmfulness, refusal_vs_harmfulness}
     }
 
     # ── Step 1: Collect bypassed/refused instructions for each language ──────
@@ -206,12 +226,19 @@ def main(args):
         torch.save(jb_vec.cpu(), save_path)
         jb_vectors[lang] = jb_vec
 
+        # Per-layer L2 norm: measures class separability at each layer
+        l2_norms = jb_vec.float().norm(dim=-1).tolist()  # [n_layers]
+        best_detect_layer = int(torch.tensor(l2_norms).argmax().item())
+
         results['jailbreak_vectors'][lang] = {
-            'n_bypassed': n_bp,
-            'n_refused':  n_ref,
-            'saved_to':   save_path,
+            'n_bypassed':        n_bp,
+            'n_refused':         n_ref,
+            'saved_to':          save_path,
+            'l2_norms':          l2_norms,
+            'best_detect_layer': best_detect_layer,
         }
-        print(f"  [{lang}] Done. Saved to {save_path}")
+        print(f"  [{lang}] Done. best_detect_layer={best_detect_layer}"
+              f" (L2={l2_norms[best_detect_layer]:.3f})  saved to {save_path}")
         torch.cuda.empty_cache()
 
     # ── Step 4: Extract refusal directions ───────────────────────────────────
@@ -233,6 +260,28 @@ def main(args):
             print(f"  [{lang}] Failed: {e}")
         torch.cuda.empty_cache()
 
+    # ── Step 4.5: Extract harmfulness directions ─────────────────────────────
+    print("\nStep 4.5: Extracting harmfulness directions (bypassed - harmless)...")
+    harmfulness_dirs = {}
+
+    for lang in viable_langs:
+        if lang not in jb_vectors:
+            continue
+        print(f"  [{lang}] Extracting harmfulness direction...")
+        try:
+            harm_dir = extract_harmfulness_direction(
+                model_base, lang_bypassed[lang], lang,
+                args.n_train, args.random_seed, args.batch_size
+            )
+            save_path = os.path.join(args.output_dir, f'harmfulness_dir_{lang}.pt')
+            torch.save(harm_dir.cpu(), save_path)
+            harmfulness_dirs[lang] = harm_dir
+            results['harmfulness_directions'][lang] = {'saved_to': save_path}
+            print(f"  [{lang}] Done.")
+        except Exception as e:
+            print(f"  [{lang}] Failed: {e}")
+        torch.cuda.empty_cache()
+
     # ── Step 5: Compute cosine similarities ──────────────────────────────────
     print("\nStep 5: Computing cosine similarities...")
     cos_sims = {}
@@ -246,6 +295,35 @@ def main(args):
             print(f"  jb={jb_lang} vs refusal={ref_lang}: avg_cos_sim={avg:.3f}")
 
     results['cosine_similarities'] = cos_sims
+
+    # ── Step 5.5: Three-way geometric analysis ────────────────────────────────
+    print("\nStep 5.5: Three-way geometric analysis (jb / refusal / harmfulness)...")
+    three_way = {}
+
+    for lang in viable_langs:
+        if lang not in jb_vectors or lang not in refusal_dirs or lang not in harmfulness_dirs:
+            continue
+        jb = jb_vectors[lang].cpu()
+        rd = refusal_dirs[lang].cpu()
+        hd = harmfulness_dirs[lang].cpu()
+
+        jb_vs_rd = compute_cosine_similarity(jb, rd)
+        jb_vs_hd = compute_cosine_similarity(jb, hd)
+        rd_vs_hd = compute_cosine_similarity(rd, hd)
+
+        three_way[lang] = {
+            'jb_vs_refusal':          jb_vs_rd,
+            'jb_vs_harmfulness':      jb_vs_hd,
+            'refusal_vs_harmfulness': rd_vs_hd,
+        }
+        avg_jb_rd = sum(jb_vs_rd) / len(jb_vs_rd)
+        avg_jb_hd = sum(jb_vs_hd) / len(jb_vs_hd)
+        avg_rd_hd = sum(rd_vs_hd) / len(rd_vs_hd)
+        print(f"  [{lang}] jb_vs_refusal={avg_jb_rd:.3f}"
+              f"  jb_vs_harmfulness={avg_jb_hd:.3f}"
+              f"  refusal_vs_harmfulness={avg_rd_hd:.3f}")
+
+    results['three_way_similarities'] = three_way
 
     # ── Step 6: Cross-lingual jailbreak vector similarity ────────────────────
     print("\nStep 6: Cross-lingual jailbreak vector similarity matrix...")

@@ -4,13 +4,18 @@ Generate all thesis figures from geometry_results.json files.
 Figures produced:
   Figure 1 (RQ1): Heatmap of avg cosine similarity — jailbreak lang × refusal lang, per model
   Figure 2 (RQ1): Layer-wise cosine similarity profiles for same-language pairs
-  Figure 3 (RQ2): Cross-lingual jailbreak vector similarity heatmap, per model
+  Figure 3 (RQ2-geo): Cross-lingual jailbreak vector similarity heatmap, per model
   Figure 4:       Three-model comparison — diagonal cosine similarity by language
+  Figure 5:       Yoruba anomaly highlight
+  Figure 6:       L2 norm profiles per layer
+  Figure 7 (RQ1): Three-way geometric relationship
+  Figure 8 (RQ2-beh): Cross-lingual transfer bypass rate matrix
 
 Usage:
   python scripts/analyze_geometry.py \
-      --results_dir output/jailbreak_analysis \
-      --output_dir  output/figures
+      --results_dir  output/jailbreak_analysis \
+      --transfer_dir output/transfer \
+      --output_dir   output/figures
 """
 
 import argparse
@@ -235,7 +240,7 @@ def plot_rq2_heatmaps(data, output_dir):
         plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04,
                      label='Cosine similarity (mid layer)')
 
-    fig.suptitle('RQ2: Cross-lingual jailbreak vector similarity',
+    fig.suptitle('RQ2 (Geometric): Cross-lingual jailbreak vector similarity',
                  fontsize=13, fontweight='bold', y=1.02)
     plt.tight_layout()
     path = os.path.join(output_dir, 'fig3_rq2_cross_lingual.pdf')
@@ -336,6 +341,240 @@ def plot_yoruba_anomaly(data, output_dir):
     print(f'  Saved: {path}')
 
 
+# ── Figure 6: L2 norm of jailbreak vector per layer ──────────────────────────
+
+def plot_l2_norm_profiles(data, output_dir):
+    """Layer-wise L2 norm of jailbreak vector for common languages across models."""
+    # Collect languages that have l2_norms in at least one model
+    lang_sets = []
+    for model in MODELS:
+        if model not in data:
+            continue
+        jb_vecs = data[model].get('jailbreak_vectors', {})
+        langs_with_norms = {l for l, v in jb_vecs.items() if 'l2_norms' in v}
+        if langs_with_norms:
+            lang_sets.append(langs_with_norms)
+
+    if not lang_sets:
+        print('  Skipping fig6: no l2_norms found (re-run extract_jailbreak_vectors.py)')
+        return
+
+    common = sorted(lang_sets[0].intersection(*lang_sets[1:]) if len(lang_sets) > 1 else lang_sets[0],
+                    key=lambda l: ALL_LANGS.index(l) if l in ALL_LANGS else 99)
+    common = [l for l in common if l != 'yo'][:6]
+
+    if not common:
+        print('  Skipping fig6: no common languages with l2_norms.')
+        return
+
+    n_cols = min(3, len(common))
+    n_rows = (len(common) + n_cols - 1) // n_cols
+    fig, axes = plt.subplots(n_rows, n_cols,
+                             figsize=(5 * n_cols, 3.5 * n_rows))
+    axes = np.array(axes).reshape(-1)
+
+    for ax, lang in zip(axes, common):
+        for model in MODELS:
+            if model not in data:
+                continue
+            jb_info = data[model].get('jailbreak_vectors', {}).get(lang, {})
+            norms = jb_info.get('l2_norms')
+            if norms is None:
+                continue
+            layers = list(range(len(norms)))
+            best_l = jb_info.get('best_detect_layer')
+            ax.plot(layers, norms,
+                    label=MODEL_LABELS[model],
+                    color=COLORS[model], linewidth=1.8)
+            if best_l is not None:
+                ax.axvline(best_l, color=COLORS[model],
+                           linewidth=1, linestyle=':', alpha=0.7)
+
+        ax.set_title(f'lang={lang}', fontsize=10)
+        ax.set_xlabel('Layer', fontsize=9)
+        ax.set_ylabel('L2 norm', fontsize=9)
+        ax.legend(fontsize=7)
+        ax.grid(True, alpha=0.3)
+
+    for ax in axes[len(common):]:
+        ax.set_visible(False)
+
+    fig.suptitle('Jailbreak direction strength: layer-wise L2 norm\n'
+                 '(dotted line = best detection layer per model)',
+                 fontsize=12, fontweight='bold')
+    plt.tight_layout()
+    path = os.path.join(output_dir, 'fig6_l2_norm_profiles.pdf')
+    plt.savefig(path, bbox_inches='tight', dpi=150)
+    plt.savefig(path.replace('.pdf', '.png'), bbox_inches='tight', dpi=150)
+    plt.close()
+    print(f'  Saved: {path}')
+
+
+# ── Figure 7: Three-way geometric relationship ───────────────────────────────
+
+def plot_three_way(data, output_dir):
+    """
+    Layer-wise cosine similarity for all three direction pairs per language:
+      jb_vec vs refusal_dir | jb_vec vs harmfulness_dir | refusal_dir vs harmfulness_dir
+    One subplot per language, lines coloured by pair type, one panel per model.
+    """
+    PAIR_COLORS = {
+        'jb_vs_refusal':          '#E53935',
+        'jb_vs_harmfulness':      '#8E24AA',
+        'refusal_vs_harmfulness': '#1E88E5',
+    }
+    PAIR_LABELS = {
+        'jb_vs_refusal':          'JB vs Refusal',
+        'jb_vs_harmfulness':      'JB vs Harmfulness',
+        'refusal_vs_harmfulness': 'Refusal vs Harmfulness',
+    }
+
+    # Collect languages that have three_way data in any model
+    all_langs = set()
+    for model in MODELS:
+        if model not in data:
+            continue
+        for lang in data[model].get('three_way_similarities', {}):
+            all_langs.add(lang)
+
+    if not all_langs:
+        print('  Skipping fig7: no three_way_similarities found.')
+        return
+
+    langs = sorted(all_langs, key=lambda l: ALL_LANGS.index(l) if l in ALL_LANGS else 99)
+    langs = [l for l in langs if l != 'yo'][:6]
+
+    available = [m for m in MODELS if m in data]
+    n_cols = len(langs)
+    n_rows = len(available)
+
+    fig, axes = plt.subplots(n_rows, n_cols,
+                             figsize=(4.5 * n_cols, 3.2 * n_rows),
+                             sharey=True)
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+    if n_cols == 1:
+        axes = axes.reshape(-1, 1)
+
+    for r, model in enumerate(available):
+        three_way = data[model].get('three_way_similarities', {})
+        for c, lang in enumerate(langs):
+            ax = axes[r][c]
+            if lang not in three_way:
+                ax.set_visible(False)
+                continue
+            tw = three_way[lang]
+            for pair, color in PAIR_COLORS.items():
+                sims = tw.get(pair)
+                if sims is None:
+                    continue
+                ax.plot(range(len(sims)), sims,
+                        color=color, linewidth=1.6,
+                        label=PAIR_LABELS[pair])
+            ax.axhline(0, color='gray', linewidth=0.8, linestyle='--')
+            ax.set_ylim(-1.0, 1.0)
+            ax.grid(True, alpha=0.3)
+            if r == 0:
+                ax.set_title(lang, fontsize=10, fontweight='bold')
+            if c == 0:
+                ax.set_ylabel(MODEL_LABELS[model], fontsize=9)
+            if r == n_rows - 1:
+                ax.set_xlabel('Layer', fontsize=8)
+            if r == 0 and c == n_cols - 1:
+                ax.legend(fontsize=7, loc='lower right')
+
+    fig.suptitle('Three-way geometric relationship: JB vector / Refusal direction / Harmfulness direction',
+                 fontsize=12, fontweight='bold')
+    plt.tight_layout()
+    path = os.path.join(output_dir, 'fig7_three_way_geometry.pdf')
+    plt.savefig(path, bbox_inches='tight', dpi=150)
+    plt.savefig(path.replace('.pdf', '.png'), bbox_inches='tight', dpi=150)
+    plt.close()
+    print(f'  Saved: {path}')
+
+
+# ── Figure 8: RQ2 behavioural transfer results ────────────────────────────────
+
+def plot_transfer_results(transfer_dir, output_dir):
+    """
+    Grouped bar chart: bypass rate by target language and source jailbreak vector.
+    One subplot per model. Baseline shown as a dashed horizontal line per language.
+    Only models for which transfer_results.json exists are plotted.
+    """
+    TARGET_ORDER = ['en', 'de', 'es', 'fr', 'it']
+    SOURCE_COLORS = {'yo': '#E53935', 'ko': '#FB8C00', 'ja': '#8E24AA'}
+    SOURCE_LABELS = {'yo': 'Yoruba (yo)', 'ko': 'Korean (ko)', 'ja': 'Japanese (ja)'}
+
+    # Load transfer data
+    transfer_data = {}
+    for model in MODELS:
+        path = os.path.join(transfer_dir, model, 'transfer_results.json')
+        if os.path.exists(path):
+            with open(path) as f:
+                transfer_data[model] = json.load(f)
+            print(f'  Loaded transfer: {model}')
+        else:
+            print(f'  Missing transfer: {path}')
+
+    if not transfer_data:
+        print('  Skipping fig8: no transfer_results.json found.')
+        return
+
+    available = [m for m in MODELS if m in transfer_data]
+    fig, axes = plt.subplots(1, len(available),
+                             figsize=(6 * len(available), 4.5),
+                             sharey=False)
+    if len(available) == 1:
+        axes = [axes]
+
+    for ax, model in zip(axes, available):
+        res = transfer_data[model]['results']
+        src_langs = transfer_data[model]['source_langs']
+        alpha     = transfer_data[model]['alpha']
+        k_star    = transfer_data[model]['k_star']
+
+        # Collect data for each target language (only those present in results)
+        tgt_langs = [l for l in TARGET_ORDER if l in res]
+        x = np.arange(len(tgt_langs))
+        n_src = len(src_langs)
+        width = 0.18
+        offsets = np.linspace(-(n_src - 1) / 2, (n_src - 1) / 2, n_src) * width
+
+        for k, src in enumerate(src_langs):
+            bypass_vals = [res[tgt]['transfer'].get(src, np.nan) for tgt in tgt_langs]
+            bars = ax.bar(x + offsets[k], bypass_vals, width,
+                          label=SOURCE_LABELS.get(src, src),
+                          color=SOURCE_COLORS.get(src, '#607D8B'),
+                          alpha=0.85, edgecolor='white')
+
+        # Baseline as scatter points
+        baselines = [res[tgt]['baseline_bypass'] for tgt in tgt_langs]
+        ax.scatter(x, baselines, marker='D', s=40, color='black',
+                   zorder=5, label='Baseline')
+
+        # Formatting
+        ax.set_xticks(x)
+        ax.set_xticklabels(tgt_langs, fontsize=10)
+        ax.set_xlabel('Target language', fontsize=10)
+        ax.set_ylabel('Bypass rate', fontsize=10)
+        ax.set_title(f'{MODEL_LABELS[model]}\n'
+                     f'$\\alpha$={alpha}, $k^*$={k_star}',
+                     fontsize=10, fontweight='bold')
+        ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1.0, decimals=0))
+        ax.legend(fontsize=8)
+        ax.grid(True, axis='y', alpha=0.3)
+        ax.set_ylim(bottom=0)
+
+    fig.suptitle('RQ2 (Behavioural): Cross-lingual jailbreak transfer — bypass rates',
+                 fontsize=12, fontweight='bold')
+    plt.tight_layout()
+    path = os.path.join(output_dir, 'fig8_rq2_transfer_bypass.pdf')
+    plt.savefig(path, bbox_inches='tight', dpi=150)
+    plt.savefig(path.replace('.pdf', '.png'), bbox_inches='tight', dpi=150)
+    plt.close()
+    print(f'  Saved: {path}')
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main(args):
@@ -354,6 +593,9 @@ def main(args):
     plot_rq2_heatmaps(data, args.output_dir)
     plot_diagonal_comparison(data, args.output_dir)
     plot_yoruba_anomaly(data, args.output_dir)
+    plot_l2_norm_profiles(data, args.output_dir)
+    plot_three_way(data, args.output_dir)
+    plot_transfer_results(args.transfer_dir, args.output_dir)
 
     print(f'\nDone. All figures saved to {args.output_dir}/')
 
@@ -363,6 +605,9 @@ if __name__ == '__main__':
     parser.add_argument('--results_dir', type=str,
                         default='output/jailbreak_analysis',
                         help='Directory containing per-model geometry_results.json files')
+    parser.add_argument('--transfer_dir', type=str,
+                        default='output/transfer',
+                        help='Directory containing per-model transfer_results.json files')
     parser.add_argument('--output_dir', type=str,
                         default='output/figures',
                         help='Where to save figures')
